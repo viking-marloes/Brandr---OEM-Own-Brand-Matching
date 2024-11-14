@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import requests
 from PIL import Image
@@ -8,6 +7,8 @@ import re
 import io
 import json
 from datetime import datetime
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 # Must be the first Streamlit command
 st.set_page_config(
@@ -17,27 +18,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-def keyboard_handler():
-    return components.html(
-        """
-        <script>
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
-                const matchButton = document.querySelector('button[kind="primary"]');
-                if (matchButton) matchButton.click();
-            } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
-                const noMatchButton = document.querySelector('button[kind="secondary"]');
-                if (noMatchButton) noMatchButton.click();
-            }
-        });
-        </script>
-        """,
-        height=0,
-    )
-
 # Add custom CSS for styling
 st.markdown("""
 <style>
+    /* MASSIVE matching buttons */
     .stButton > button {
         border-radius: 50% !important;
         width: 250px !important;
@@ -53,16 +37,13 @@ st.markdown("""
 
     .stButton > button:hover {
         transform: scale(1.1) !important;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3) !important;
     }
 
     button[kind="secondary"] {
         background-color: #ff4b4b !important;
-        color: white !important;
     }
     button[kind="primary"] {
         background-color: #4CAF50 !important;
-        color: white !important;
     }
 
     .match-buttons {
@@ -70,7 +51,6 @@ st.markdown("""
         justify-content: center;
         gap: 80px;
         margin: 20px 0;
-        padding: 20px;
     }
     
     .product-card {
@@ -81,61 +61,60 @@ st.markdown("""
         margin: 10px;
     }
 
+    /* Fixed size image container */
     .product-image-container {
+        width: 100%;
+        height: 80px;  /* Fixed small height */
         display: flex;
-        justify-content: center;
         align-items: center;
+        justify-content: center;
         margin: 5px 0;
-        max-height: 150px;
-        overflow: hidden;
+        background: #f8f9fa;
+        border-radius: 8px;
     }
 
+    /* Force consistent image size */
     .product-image-container img {
-        max-height: 100px !important;
+        max-height: 60px !important;  /* Very small fixed height */
         width: auto !important;
         object-fit: contain !important;
     }
 
-    .product-card h2, .product-card h3 {
-        margin: 0 !important;
-        padding: 5px 0 !important;
+    .product-info {
+        margin-top: 10px;
     }
 
-    .product-card p {
-        margin: 5px 0 !important;
+    .stSpinner > div {
+        position: relative;
+        top: 10px;
+    }
+
+    /* Hide default Streamlit elements */
+    .stDeployButton, footer {
+        display: none !important;
+    }
+
+    /* Compact layout */
+    .stMarkdown {
+        margin: 0 !important;
         padding: 0 !important;
     }
 
-    div.stMarkdown {
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-
-    .top-controls {
+    /* Keyboard shortcuts display */
+    .shortcuts {
         background: #f0f2f6;
-        padding: 10px;
-        border-radius: 10px;
-        margin-bottom: 15px;
-    }
-
-    div[data-testid="stToolbar"] {
-        display: none;
-    }
-
-    .main > div {
-        padding: 10px !important;
-    }
-
-    .stAlert {
-        padding: 10px !important;
-        margin: 10px 0 !important;
-    }
-    
-    iframe {
-        display: none;
+        padding: 8px;
+        border-radius: 5px;
+        margin: 5px 0;
+        font-size: 0.9em;
+        text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Initialize session state for keyboard handling
+if 'key_handled' not in st.session_state:
+    st.session_state.key_handled = False
 
 def extract_sku_image_url(html_content):
     pattern = r'datalayerInitialObject\s*=\s*({.*?});'
@@ -156,66 +135,50 @@ def extract_sku_image_url(html_content):
             return None
     return None
 
-def generate_product_page_url(sku, country_code='nl'):
-    base_urls = {
-        "uk": "https://www.viking-direct.co.uk/en/-p-", 
-        "gb": "https://www.viking-direct.co.uk/en/-p-",
-        "ie": "https://www.vikingdirect.ie/en/-p-",
-        "de": "https://www.viking.de/de/-p-",
-        "at": "https://www.vikingdirekt.at/de/-p-",
-        "nl": "https://www.vikingdirect.nl/nl/-p-",
-        "benl": "https://www.vikingdirect.be/nl/-p-",
-        "befr": "https://www.vikingdirect.be/fr/-p-",
-        "bewa": "https://www.vikingdirect.be/fr/-p-",
-        "chde": "https://www.vikingdirekt.ch/de/-p-",
-        "chfr": "https://www.vikingdirekt.ch/fr/-p-",
-        "lu": "https://www.viking-direct.lu/fr/-p-"
-    }
-    base_url = base_urls.get(country_code.lower())
-    if base_url:
-        return f"{base_url}{sku}"
+def load_and_resize_image(img_bytes, max_size=(60, 60)):
+    if img_bytes:
+        try:
+            img = Image.open(BytesIO(img_bytes))
+            img.thumbnail(max_size, Image.Resampling.LANCZOS)
+            return img
+        except Exception:
+            return None
     return None
 
 @st.cache_data(ttl=3600)
-def get_product_image(sku):
+def get_product_image(sku, country_code='nl'):
     if not sku or pd.isna(sku):
         return None
         
-    for country in ['nl', 'uk', 'de']:
-        try:
-            product_url = generate_product_page_url(sku, country)
-            if not product_url:
-                continue
-                
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-            
-            response = requests.get(product_url, headers=headers, timeout=10)
-            if response.status_code != 200:
-                continue
-                
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+    
+    try:
+        # Try direct product page first
+        product_url = f"https://www.vikingdirect.nl/nl/-p-{sku}"
+        response = requests.get(product_url, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
             image_url = extract_sku_image_url(response.text)
-            if not image_url:
-                continue
-                
-            img_response = requests.get(image_url, headers=headers, timeout=10)
-            if img_response.status_code == 200:
-                return Image.open(BytesIO(img_response.content))
-                
-        except Exception as e:
-            continue
-            
+            if image_url:
+                img_response = requests.get(image_url, headers=headers, timeout=5)
+                if img_response.status_code == 200:
+                    return load_and_resize_image(img_response.content)
+                    
+    except Exception:
+        pass
+        
     return None
 
 def handle_decision(is_match):
-    current_row = st.session_state.data.iloc[st.session_state.current_index].to_dict()
-    st.session_state.matches.append({
-        'index': st.session_state.current_index,
-        'is_match': is_match,
-        'data': current_row
-    })
-    if st.session_state.current_index < len(st.session_state.data) - 1:
+    if st.session_state.current_index < len(st.session_state.data):
+        current_row = st.session_state.data.iloc[st.session_state.current_index].to_dict()
+        st.session_state.matches.append({
+            'index': st.session_state.current_index,
+            'is_match': is_match,
+            'data': current_row
+        })
         st.session_state.current_index += 1
         st.rerun()
 
@@ -244,7 +207,6 @@ if 'matches' not in st.session_state:
     st.session_state.matches = []
 
 st.title("Product Matcher 💘")
-keyboard_handler()  # Add keyboard support
 
 # File uploader
 uploaded_file = st.file_uploader("Upload your Excel file", type=['xlsx', 'xls'])
@@ -288,16 +250,21 @@ if st.session_state.data is not None:
         
         left_col, center_col, right_col = st.columns([4,3,4])
         
+        # Preload both images
+        with st.spinner('Loading images...'):
+            own_image = get_product_image(str(current_row['Own SKU']))
+            oem_image = get_product_image(str(current_row['OEM SKU']))
+        
         with left_col:
             st.markdown('<div class="product-card">', unsafe_allow_html=True)
             st.subheader("Own Product")
             st.markdown('<div class="product-image-container">', unsafe_allow_html=True)
-            own_image = get_product_image(str(current_row['Own SKU']))
             if own_image:
                 st.image(own_image)
             st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown(f"**SKU:** {current_row['Own SKU']}")
-            st.markdown(f"**Title:** {current_row['Own Title']}")
+            with st.container():
+                st.markdown(f"**SKU:** {current_row['Own SKU']}")
+                st.markdown(f"**Title:** {current_row['Own Title']}")
             st.markdown('</div>', unsafe_allow_html=True)
 
         with center_col:
@@ -307,6 +274,7 @@ if st.session_state.data is not None:
             st.markdown("---")
             st.markdown(current_row['Reasoning'])
             
+            # Match buttons
             st.markdown('<div class="match-buttons">', unsafe_allow_html=True)
             col1, col2 = st.columns(2)
             with col1:
@@ -317,24 +285,40 @@ if st.session_state.data is not None:
                     handle_decision(True)
             st.markdown('</div>', unsafe_allow_html=True)
             
-            st.info("""
+            # Keyboard shortcuts
+            st.markdown('<div class="shortcuts">', unsafe_allow_html=True)
+            st.markdown("""
             **Keyboard Shortcuts:**
             - Press 'Y' or '→' for Match
             - Press 'N' or '←' for No Match
             """)
+            st.markdown('</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
         with right_col:
             st.markdown('<div class="product-card">', unsafe_allow_html=True)
             st.subheader("OEM Product")
             st.markdown('<div class="product-image-container">', unsafe_allow_html=True)
-            oem_image = get_product_image(str(current_row['OEM SKU']))
             if oem_image:
                 st.image(oem_image)
             st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown(f"**SKU:** {current_row['OEM SKU']}")
-            st.markdown(f"**Title:** {current_row['OEM Title']}")
+            with st.container():
+                st.markdown(f"**SKU:** {current_row['OEM SKU']}")
+                st.markdown(f"**Title:** {current_row['OEM Title']}")
             st.markdown('</div>', unsafe_allow_html=True)
 
     else:
         st.success("You've reviewed all products! Don't forget to save your progress.")
+
+# Add keyboard listener
+st.markdown("""
+<script>
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
+        document.querySelector('button[kind="primary"]').click();
+    } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
+        document.querySelector('button[kind="secondary"]').click();
+    }
+});
+</script>
+""", unsafe_allow_html=True)
