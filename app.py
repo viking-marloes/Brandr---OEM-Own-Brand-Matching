@@ -24,9 +24,13 @@ def main():
     uploaded_file = st.file_uploader("Upload your Excel file", type=['xlsx', 'xls'])
     
     if uploaded_file is not None and st.session_state.data is None:
-        st.session_state.data = pd.read_excel(uploaded_file)
-        st.session_state.current_index = 0
-        st.session_state.matches = []
+        try:
+            st.session_state.data = pd.read_excel(uploaded_file)
+            st.session_state.current_index = 0
+            st.session_state.matches = []
+        except Exception as e:
+            st.error(f"Error reading Excel file: {str(e)}")
+            return
 
     if st.session_state.data is not None:
         # Jump to specific row
@@ -56,33 +60,42 @@ def main():
             # Left column - Own Product
             with left_col:
                 st.subheader("Own Product")
-                st.image(current_row['Own SKU Image'] if pd.notna(current_row['Own SKU Image']) else "placeholder.png", 
-                        use_column_width=True)
-                st.write(f"**SKU:** {current_row['Own SKU']}")
-                st.write(f"**Title:** {current_row['Own Title']}")
+                st.markdown("---")
+                st.markdown(f"**SKU:** {current_row['Own SKU']}")
+                st.markdown(f"**Title:** {current_row['Own Title']}")
+                st.markdown(f"**Category:** {current_row['Category']}")
 
             # Center column - Reasoning and Buttons
             with center_col:
                 st.markdown("### AI Reasoning")
-                st.write(f"**Certainty Score:** {current_row['Certainty Score']}")
-                st.write(current_row['Reasoning'])
+                st.markdown(f"**Certainty Score:** {current_row['Certainty Score']}")
+                st.markdown("---")
+                st.markdown(current_row['Reasoning'])
                 
                 # Like/Dislike buttons
+                st.markdown("---")
                 col1, col2 = st.columns(2)
                 with col1:
-                    if st.button("❌ No Match", use_container_width=True):
+                    if st.button("❌ No Match", use_container_width=True, key="no_match"):
                         handle_decision(False)
                 with col2:
-                    if st.button("❤️ Match", use_container_width=True):
+                    if st.button("❤️ Match", use_container_width=True, key="match"):
                         handle_decision(True)
 
             # Right column - OEM Product
             with right_col:
                 st.subheader("OEM Product")
-                st.image(current_row['OEM SKU Image'] if pd.notna(current_row['OEM SKU Image']) else "placeholder.png", 
-                        use_container_width=True)
-                st.write(f"**SKU:** {current_row['OEM SKU']}")
-                st.write(f"**Title:** {current_row['OEM Title']}")
+                st.markdown("---")
+                st.markdown(f"**SKU:** {current_row['OEM SKU']}")
+                st.markdown(f"**Title:** {current_row['OEM Title']}")
+
+            # Keyboard shortcuts info
+            st.markdown("---")
+            st.markdown("""
+            **Keyboard shortcuts:**
+            - Press 'Y' or '→' for Match
+            - Press 'N' or '←' for No Match
+            """)
 
         else:
             st.success("You've reviewed all products! Don't forget to save your progress.")
@@ -108,27 +121,37 @@ def save_matches():
     if matched_data:
         df = pd.DataFrame(matched_data)
         
-        # Save to Excel
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"matched_products_{timestamp}.xlsx"
-        df.to_excel(filename, index=False)
+        # Create Excel file in memory
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
         
         # Create download button
-        with open(filename, 'rb') as f:
-            bytes_data = f.read()
         st.download_button(
             label="Download Matched Products",
-            data=bytes_data,
-            file_name=filename,
+            data=output.getvalue(),
+            file_name=f"matched_products_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         
-        # Clean up the temporary file
-        os.remove(filename)
-        
-        st.success(f"Saved {len(matched_data)} matches!")
+        st.success(f"Ready to download {len(matched_data)} matches!")
     else:
         st.warning("No matched products to save!")
+
+# Add custom CSS for styling
+st.markdown("""
+<style>
+    .stButton > button {
+        width: 100%;
+        height: 60px;
+        font-size: 20px;
+    }
+    .markdown-text-container {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
