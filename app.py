@@ -22,36 +22,34 @@ def init_keyboard_shortcuts():
     components.html(
         """
         <script>
-        // Remove any existing event listeners
-        if (window.keyboardHandler) {
-            document.removeEventListener('keydown', window.keyboardHandler);
-        }
-
-        // Define new handler
-        window.keyboardHandler = function(e) {
-            // Ignore key presses if focused on input or textarea
-            const tag = e.target.tagName.toLowerCase();
-            if (tag === 'input' || tag === 'textarea') {
-                return;
+            // Remove any existing event listeners to prevent multiple bindings
+            if (window.keyboardHandler) {
+                document.removeEventListener('keydown', window.keyboardHandler);
             }
 
-            if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
-                const buttons = Array.from(document.querySelectorAll('button'));
-                const matchButton = buttons.find(btn => btn.innerText.trim() === '❤️');
-                if (matchButton) {
-                    matchButton.click();
+            // Define new handler
+            window.keyboardHandler = function(e) {
+                // Ignore key presses if focused on input or textarea
+                const tag = e.target.tagName.toLowerCase();
+                if (tag === 'input' || tag === 'textarea') {
+                    return;
                 }
-            } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
-                const buttons = Array.from(document.querySelectorAll('button'));
-                const noMatchButton = buttons.find(btn => btn.innerText.trim() === '❌');
-                if (noMatchButton) {
-                    noMatchButton.click();
-                }
-            }
-        };
 
-        // Add new handler
-        document.addEventListener('keydown', window.keyboardHandler);
+                if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
+                    const matchButton = document.querySelector('button[aria-label="It\'s a match! (Y)"]');
+                    if (matchButton) {
+                        matchButton.click();
+                    }
+                } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
+                    const noMatchButton = document.querySelector('button[aria-label="Not a match (N)"]');
+                    if (noMatchButton) {
+                        noMatchButton.click();
+                    }
+                }
+            };
+
+            // Add new handler
+            document.addEventListener('keydown', window.keyboardHandler);
         </script>
         """,
         height=0,
@@ -70,7 +68,7 @@ st.markdown("""
     /* Style for circular buttons */
     .stButton > button {
         border-radius: 50% !important;
-        width: 80px !important; /* Reduced size for better layout */
+        width: 80px !important; /* Adjusted size for better layout */
         height: 80px !important;
         font-size: 24px !important; /* Adjusted font size */
         display: flex !important;
@@ -81,14 +79,14 @@ st.markdown("""
         box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important;
     }
 
-    /* Specific styles for the 'No Match' button */
-    button:contains('❌') {
+    /* Specific styles for the 'No Match' button using aria-label */
+    button[aria-label="Not a match (N)"] {
         background-color: #ff4b4b !important;
         color: white !important;
     }
 
-    /* Specific styles for the 'Match' button */
-    button:contains('❤️') {
+    /* Specific styles for the 'Match' button using aria-label */
+    button[aria-label="It's a match! (Y)"] {
         background-color: #4CAF50 !important;
         color: white !important;
     }
@@ -229,6 +227,12 @@ def handle_decision(is_match):
         st.session_state.current_index += 1
         st.experimental_rerun()
 
+def handle_match():
+    handle_decision(True)
+
+def handle_no_match():
+    handle_decision(False)
+
 def save_matches():
     matched_indices = {match['index'] for match in st.session_state.matches if match['is_match'] is False}
     all_data = []
@@ -323,9 +327,9 @@ if st.session_state.data is not None:
             
             col1, col2 = st.columns(2)
             with col1:
-                st.button("❌", key="no_match", help="Not a match (N)", on_click=lambda: handle_decision(False))
+                st.button("❌", key="no_match", help="Not a match (N)", on_click=handle_no_match)
             with col2:
-                st.button("❤️", key="match", help="It's a match! (Y)", on_click=lambda: handle_decision(True))
+                st.button("❤️", key="match", help="It's a match! (Y)", on_click=handle_match)
             
             st.markdown('<div class="shortcuts-info">', unsafe_allow_html=True)
             st.markdown("""
