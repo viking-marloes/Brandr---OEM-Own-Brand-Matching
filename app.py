@@ -23,27 +23,35 @@ def init_keyboard_shortcuts():
         """
         <script>
         // Remove any existing event listeners
-        if (window.oldKeydownHandler) {
-            document.removeEventListener('keydown', window.oldKeydownHandler);
+        if (window.keyboardHandler) {
+            document.removeEventListener('keydown', window.keyboardHandler);
         }
 
         // Define new handler
-        window.oldKeydownHandler = function(e) {
-            if (e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'textarea') {
-                // Do not trigger shortcuts when typing in input fields or text areas
+        window.keyboardHandler = function(e) {
+            // Ignore key presses if focused on input or textarea
+            const tag = e.target.tagName.toLowerCase();
+            if (tag === 'input' || tag === 'textarea') {
                 return;
             }
+
             if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
-                const matchButton = document.querySelector('button[aria-label="It's a match! (Y)"]');
-                if (matchButton) matchButton.click();
+                const buttons = Array.from(document.querySelectorAll('button'));
+                const matchButton = buttons.find(btn => btn.innerText.trim() === '❤️');
+                if (matchButton) {
+                    matchButton.click();
+                }
             } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
-                const noMatchButton = document.querySelector('button[aria-label="Not a match (N)"]');
-                if (noMatchButton) noMatchButton.click();
+                const buttons = Array.from(document.querySelectorAll('button'));
+                const noMatchButton = buttons.find(btn => btn.innerText.trim() === '❌');
+                if (noMatchButton) {
+                    noMatchButton.click();
+                }
             }
         };
 
         // Add new handler
-        document.addEventListener('keydown', window.oldKeydownHandler);
+        document.addEventListener('keydown', window.keyboardHandler);
         </script>
         """,
         height=0,
@@ -59,39 +67,45 @@ st.markdown("""
         padding: 0px;
     }
 
+    /* Style for circular buttons */
     .stButton > button {
         border-radius: 50% !important;
-        width: 250px !important;
-        height: 250px !important;
-        font-size: 120px !important;
+        width: 80px !important; /* Reduced size for better layout */
+        height: 80px !important;
+        font-size: 24px !important; /* Adjusted font size */
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        margin: 10px auto !important; /* Adjusted margin */
+        margin: 10px auto !important; /* Center the buttons */
         transition: all 0.3s !important;
         box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important;
     }
 
-    button[aria-label="Not a match (N)"] {
+    /* Specific styles for the 'No Match' button */
+    button:contains('❌') {
         background-color: #ff4b4b !important;
         color: white !important;
     }
-    button[aria-label="It's a match! (Y)"] {
+
+    /* Specific styles for the 'Match' button */
+    button:contains('❤️') {
         background-color: #4CAF50 !important;
         color: white !important;
     }
 
+    /* Product card styling */
     .product-card {
         border-radius: 15px;
-        padding: 15px;
+        padding: 10px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         background: white;
-        margin: 0px;
+        margin: 5px;
     }
 
+    /* Image container styling */
     .product-image-container {
         width: 100%;
-        height: 250px;
+        height: 200px; /* Adjusted height */
         display: flex;
         align-items: center;
         justify-content: center;
@@ -101,16 +115,18 @@ st.markdown("""
     }
 
     .product-image-container img {
-        max-height: 240px !important; /* Slightly reduced to fit better */
+        max-height: 190px !important; /* Slightly reduced to fit better */
         width: auto !important;
         object-fit: contain !important;
     }
 
-    div.stMarkdown {
+    /* Remove extra spacing in markdown elements */
+    div.stMarkdown, div.stSpinner {
         margin: 0 !important;
         padding: 0 !important;
     }
     
+    /* Shortcuts info styling */
     .shortcuts-info {
         background: #f0f2f6;
         padding: 10px;
@@ -119,10 +135,9 @@ st.markdown("""
         text-align: center;
     }
 
-    /* Remove extra spacing in columns */
-    .css-1v3fvcr {
-        padding-top: 0px;
-        padding-bottom: 0px;
+    /* Adjust column padding to remove grey space */
+    [data-testid="column"] {
+        padding: 0px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -195,7 +210,7 @@ def get_product_image(sku):
             img_response = requests.get(image_url, headers=headers, timeout=10)
             if img_response.status_code == 200:
                 img = Image.open(BytesIO(img_response.content))
-                img.thumbnail((250, 250), Image.Resampling.LANCZOS)  # 3x bigger than before
+                img.thumbnail((250, 250), Image.Resampling.LANCZOS)  # Maintain aspect ratio
                 return img
                 
     except Exception as e:
@@ -308,9 +323,9 @@ if st.session_state.data is not None:
             
             col1, col2 = st.columns(2)
             with col1:
-                st.button("❌", key="no_match", help="Not a match (N)", type="secondary", on_click=lambda: handle_decision(False))
+                st.button("❌", key="no_match", help="Not a match (N)", on_click=lambda: handle_decision(False))
             with col2:
-                st.button("❤️", key="match", help="It's a match! (Y)", type="primary", on_click=lambda: handle_decision(True))
+                st.button("❤️", key="match", help="It's a match! (Y)", on_click=lambda: handle_decision(True))
             
             st.markdown('<div class="shortcuts-info">', unsafe_allow_html=True)
             st.markdown("""
