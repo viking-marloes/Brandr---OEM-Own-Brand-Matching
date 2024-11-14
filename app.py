@@ -133,7 +133,7 @@ def get_product_image(sku):
         }
         
         # Try multiple country codes
-        for country in ['nl', 'uk', 'de']:
+        for country in ['uk', 'de', 'nl']:
             product_url = generate_product_page_url(sku, country)
             if not product_url:
                 continue
