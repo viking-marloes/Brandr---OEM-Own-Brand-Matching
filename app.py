@@ -30,10 +30,10 @@ def init_keyboard_shortcuts():
         // Define new handler
         window.oldKeydownHandler = function(e) {
             if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
-                const matchButton = document.querySelector('button[kind="primary"]');
+                const matchButton = document.getElementById("match-button");
                 if (matchButton) matchButton.click();
             } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
-                const noMatchButton = document.querySelector('button[kind="secondary"]');
+                const noMatchButton = document.getElementById("no-match-button");
                 if (noMatchButton) noMatchButton.click();
             }
         };
@@ -83,7 +83,7 @@ st.markdown("""
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 5px 0; /* Adjust as needed */
+        margin: 5px 0;
         background: #f8f9fa;
         border-radius: 5px;
     }
@@ -108,8 +108,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-
 
 def generate_product_page_url(sku, country_code='nl'):
     base_urls = {
@@ -179,7 +177,7 @@ def get_product_image(sku):
             img_response = requests.get(image_url, headers=headers, timeout=10)
             if img_response.status_code == 200:
                 img = Image.open(BytesIO(img_response.content))
-                img.thumbnail((250, 250), Image.Resampling.LANCZOS)  # 3x bigger than before
+                img.thumbnail((250, 250), Image.Resampling.LANCZOS)
                 return img
                 
     except Exception as e:
