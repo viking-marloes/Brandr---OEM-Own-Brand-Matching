@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import requests
 from PIL import Image
@@ -14,6 +15,27 @@ st.set_page_config(
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="collapsed"
+)
+
+# Add custom CSS and keyboard shortcuts JavaScript
+components.html(
+    """
+    <script>
+    const handleKeyPress = (e) => {
+        if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
+            document.querySelector('button[kind="primary"]').click();
+        } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
+            document.querySelector('button[kind="secondary"]').click();
+        }
+    };
+    
+    if (!window.keyListenerAdded) {
+        document.addEventListener('keydown', handleKeyPress);
+        window.keyListenerAdded = true;
+    }
+    </script>
+    """,
+    height=0
 )
 
 # Add custom CSS for styling
@@ -51,7 +73,7 @@ st.markdown("""
 
     .product-image-container {
         width: 100%;
-        height: 60px;
+        height: 180px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -61,7 +83,7 @@ st.markdown("""
     }
 
     .product-image-container img {
-        max-height: 60px !important;
+        max-height: 180px !important;
         width: auto !important;
         object-fit: contain !important;
     }
@@ -69,6 +91,14 @@ st.markdown("""
     div.stMarkdown {
         margin: 0 !important;
         padding: 0 !important;
+    }
+    
+    .shortcuts-info {
+        background: #f0f2f6;
+        padding: 10px;
+        border-radius: 5px;
+        margin-top: 10px;
+        text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -141,7 +171,7 @@ def get_product_image(sku):
             img_response = requests.get(image_url, headers=headers, timeout=10)
             if img_response.status_code == 200:
                 img = Image.open(BytesIO(img_response.content))
-                img.thumbnail((60, 60), Image.Resampling.LANCZOS)
+                img.thumbnail((180, 180), Image.Resampling.LANCZOS)  # 3x bigger than before
                 return img
                 
     except Exception as e:
@@ -256,11 +286,13 @@ if st.session_state.data is not None:
                 if st.button("❤️", key="match", help="It's a match! (Y)", type="primary"):
                     handle_decision(True)
             
-            st.info("""
+            st.markdown('<div class="shortcuts-info">', unsafe_allow_html=True)
+            st.markdown("""
             **Keyboard Shortcuts:**
             - Press 'Y' or '→' for Match
             - Press 'N' or '←' for No Match
             """)
+            st.markdown('</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
         with right_col:
@@ -278,16 +310,3 @@ if st.session_state.data is not None:
 
     else:
         st.success("You've reviewed all products! Don't forget to save your progress.")
-
-# Add keyboard handler
-st.markdown("""
-<script>
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
-        document.querySelector('button[kind="primary"]').click();
-    } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
-        document.querySelector('button[kind="secondary"]').click();
-    }
-});
-</script>
-""", unsafe_allow_html=True)
