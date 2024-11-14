@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import requests
 from PIL import Image
@@ -15,6 +16,24 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+def keyboard_handler():
+    return components.html(
+        """
+        <script>
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
+                const matchButton = document.querySelector('button[kind="primary"]');
+                if (matchButton) matchButton.click();
+            } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
+                const noMatchButton = document.querySelector('button[kind="secondary"]');
+                if (noMatchButton) noMatchButton.click();
+            }
+        });
+        </script>
+        """,
+        height=0,
+    )
 
 # Add custom CSS for styling
 st.markdown("""
@@ -66,13 +85,13 @@ st.markdown("""
         display: flex;
         justify-content: center;
         align-items: center;
-        margin: 10px 0;
-        max-height: 300px;
+        margin: 5px 0;
+        max-height: 150px;
         overflow: hidden;
     }
 
     .product-image-container img {
-        max-height: 250px !important;
+        max-height: 100px !important;
         width: auto !important;
         object-fit: contain !important;
     }
@@ -110,6 +129,10 @@ st.markdown("""
     .stAlert {
         padding: 10px !important;
         margin: 10px 0 !important;
+    }
+    
+    iframe {
+        display: none;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -221,6 +244,7 @@ if 'matches' not in st.session_state:
     st.session_state.matches = []
 
 st.title("Product Matcher 💘")
+keyboard_handler()  # Add keyboard support
 
 # File uploader
 uploaded_file = st.file_uploader("Upload your Excel file", type=['xlsx', 'xls'])
