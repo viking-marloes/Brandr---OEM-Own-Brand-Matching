@@ -26,18 +26,22 @@ def init_keyboard_shortcuts():
         if (window.oldKeydownHandler) {
             document.removeEventListener('keydown', window.oldKeydownHandler);
         }
-        
+
         // Define new handler
         window.oldKeydownHandler = function(e) {
+            if (e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'textarea') {
+                // Do not trigger shortcuts when typing in input fields or text areas
+                return;
+            }
             if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
-                const matchButton = document.querySelector('button[kind="primary"]');
+                const matchButton = document.querySelector('button[aria-label="It's a match! (Y)"]');
                 if (matchButton) matchButton.click();
             } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
-                const noMatchButton = document.querySelector('button[kind="secondary"]');
+                const noMatchButton = document.querySelector('button[aria-label="Not a match (N)"]');
                 if (noMatchButton) noMatchButton.click();
             }
         };
-        
+
         // Add new handler
         document.addEventListener('keydown', window.oldKeydownHandler);
         </script>
@@ -48,6 +52,13 @@ def init_keyboard_shortcuts():
 # Add custom CSS for styling
 st.markdown("""
 <style>
+    /* Remove default margins from subheaders */
+    .stSubheader {
+        margin-top: 0px;
+        margin-bottom: 5px;
+        padding: 0px;
+    }
+
     .stButton > button {
         border-radius: 50% !important;
         width: 250px !important;
@@ -56,16 +67,16 @@ st.markdown("""
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        margin: 0 auto !important;
+        margin: 10px auto !important; /* Adjusted margin */
         transition: all 0.3s !important;
         box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important;
     }
 
-    button[kind="secondary"] {
+    button[aria-label="Not a match (N)"] {
         background-color: #ff4b4b !important;
         color: white !important;
     }
-    button[kind="primary"] {
+    button[aria-label="It's a match! (Y)"] {
         background-color: #4CAF50 !important;
         color: white !important;
     }
@@ -90,7 +101,7 @@ st.markdown("""
     }
 
     .product-image-container img {
-        max-height: 250px !important;
+        max-height: 240px !important; /* Slightly reduced to fit better */
         width: auto !important;
         object-fit: contain !important;
     }
@@ -106,6 +117,12 @@ st.markdown("""
         border-radius: 5px;
         margin-top: 10px;
         text-align: center;
+    }
+
+    /* Remove extra spacing in columns */
+    .css-1v3fvcr {
+        padding-top: 0px;
+        padding-bottom: 0px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -195,7 +212,7 @@ def handle_decision(is_match):
     })
     if st.session_state.current_index < len(st.session_state.data) - 1:
         st.session_state.current_index += 1
-        st.rerun()
+        st.experimental_rerun()
 
 def save_matches():
     matched_indices = {match['index'] for match in st.session_state.matches if match['is_match'] is False}
@@ -246,6 +263,7 @@ if st.session_state.data is not None:
                                 value=st.session_state.current_index)
         if jump_to != st.session_state.current_index:
             st.session_state.current_index = jump_to
+            st.experimental_rerun()
 
     with col2:
         excel_data, count = save_matches()
@@ -268,12 +286,14 @@ if st.session_state.data is not None:
         
         with left_col:
             st.markdown('<div class="product-card">', unsafe_allow_html=True)
+            st.markdown('<div style="text-align: center;">', unsafe_allow_html=True)  # Center align the subheader
             st.subheader("Own Product")
+            st.markdown('</div>', unsafe_allow_html=True)
             with st.spinner('Loading own product image...'):
                 own_image = get_product_image(str(current_row['Own SKU']))
                 if own_image:
                     st.markdown('<div class="product-image-container">', unsafe_allow_html=True)
-                    st.image(own_image)
+                    st.image(own_image, use_column_width=False)
                     st.markdown('</div>', unsafe_allow_html=True)
             st.markdown(f"**SKU:** {current_row['Own SKU']}")
             st.markdown(f"**Title:** {current_row['Own Title']}")
@@ -288,11 +308,9 @@ if st.session_state.data is not None:
             
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("❌", key="no_match", help="Not a match (N)", type="secondary"):
-                    handle_decision(False)
+                st.button("❌", key="no_match", help="Not a match (N)", type="secondary", on_click=lambda: handle_decision(False))
             with col2:
-                if st.button("❤️", key="match", help="It's a match! (Y)", type="primary"):
-                    handle_decision(True)
+                st.button("❤️", key="match", help="It's a match! (Y)", type="primary", on_click=lambda: handle_decision(True))
             
             st.markdown('<div class="shortcuts-info">', unsafe_allow_html=True)
             st.markdown("""
@@ -305,12 +323,14 @@ if st.session_state.data is not None:
 
         with right_col:
             st.markdown('<div class="product-card">', unsafe_allow_html=True)
+            st.markdown('<div style="text-align: center;">', unsafe_allow_html=True)  # Center align the subheader
             st.subheader("OEM Product")
+            st.markdown('</div>', unsafe_allow_html=True)
             with st.spinner('Loading OEM product image...'):
                 oem_image = get_product_image(str(current_row['OEM SKU']))
                 if oem_image:
                     st.markdown('<div class="product-image-container">', unsafe_allow_html=True)
-                    st.image(oem_image)
+                    st.image(oem_image, use_column_width=False)
                     st.markdown('</div>', unsafe_allow_html=True)
             st.markdown(f"**SKU:** {current_row['OEM SKU']}")
             st.markdown(f"**Title:** {current_row['OEM Title']}")
