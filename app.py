@@ -11,7 +11,7 @@ from datetime import datetime
 
 # Must be the first Streamlit command
 st.set_page_config(
-    page_title="Brandr: OEM & Own Brand Matching",
+    page_title="Brandr: OEM - Own Brand Matching",
     page_icon="💘",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -192,7 +192,7 @@ if 'current_index' not in st.session_state:
 if 'matches' not in st.session_state:
     st.session_state.matches = []
 
-st.title("Brandr: OEM to Own Brand Matching 💘")
+st.title("Brandr: OEM - Own Brand Matching 💘")
 
 # File uploader
 uploaded_file = st.file_uploader("Drop Your Excel & Let’s Tango!", type=['xlsx', 'xls'])
