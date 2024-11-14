@@ -35,7 +35,7 @@ def handle_decision(is_match):
     })
     if st.session_state.current_index < len(st.session_state.data) - 1:
         st.session_state.current_index += 1
-        st.experimental_rerun()
+        st.rerun()  # Updated from experimental_rerun()
 
 def save_matches():
     if not st.session_state.matches:
@@ -77,11 +77,12 @@ st.title("Product Matcher")
 # File uploader
 uploaded_file = st.file_uploader("Upload your Excel file", type=['xlsx', 'xls'])
 
-if uploaded_file is not None and st.session_state.data is None:
+if uploaded_file is not None:
     try:
-        st.session_state.data = pd.read_excel(uploaded_file)
-        st.session_state.current_index = 0
-        st.session_state.matches = []
+        if st.session_state.data is None:
+            st.session_state.data = pd.read_excel(uploaded_file)
+            st.session_state.current_index = 0
+            st.session_state.matches = []
     except Exception as e:
         st.error(f"Error reading Excel file: {str(e)}")
 
@@ -116,7 +117,10 @@ if st.session_state.data is not None:
             st.markdown("---")
             st.markdown(f"**SKU:** {current_row['Own SKU']}")
             st.markdown(f"**Title:** {current_row['Own Title']}")
-            st.markdown(f"**Category:** {current_row['Category']}")
+            try:
+                st.markdown(f"**Category:** {current_row['Category']}")
+            except:
+                pass  # Skip if Category doesn't exist
 
         # Center column - Reasoning and Buttons
         with center_col:
@@ -142,7 +146,7 @@ if st.session_state.data is not None:
             st.markdown(f"**SKU:** {current_row['OEM SKU']}")
             st.markdown(f"**Title:** {current_row['OEM Title']}")
 
-        # Keyboard shortcuts info
+        # Add keyboard handling
         st.markdown("---")
         st.markdown("""
         **Keyboard shortcuts:**
