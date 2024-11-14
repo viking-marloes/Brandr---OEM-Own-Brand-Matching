@@ -17,42 +17,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Add custom CSS and keyboard shortcuts JavaScript
-def init_keyboard_shortcuts():
-    components.html(
-        """
-        <script>
-        // Remove any existing event listeners
-        if (window.oldKeydownHandler) {
-            document.removeEventListener('keydown', window.oldKeydownHandler);
-        }
-        
-        // Define new handler
-        window.oldKeydownHandler = function(e) {
-            if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
-                const matchButton = document.getElementById("match-button");
-                if (matchButton) matchButton.click();
-            } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
-                const noMatchButton = document.getElementById("no-match-button");
-                if (noMatchButton) noMatchButton.click();
-            }
-        };
-        
-        // Add new handler
-        document.addEventListener('keydown', window.oldKeydownHandler);
-        </script>
-        """,
-        height=0,
-    )
-
-# Add custom CSS for styling
+# Add custom CSS for styling with enlarged buttons
 st.markdown("""
 <style>
     .stButton > button {
         border-radius: 50% !important;
-        width: 200px !important;
-        height: 200px !important;
-        font-size: 90px !important;
+        width: 400px !important;  /* Doubled width */
+        height: 400px !important; /* Doubled height */
+        font-size: 180px !important; /* Increased font size */
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -221,7 +193,6 @@ if 'matches' not in st.session_state:
     st.session_state.matches = []
 
 st.title("Product Matcher 💘")
-init_keyboard_shortcuts()
 
 # File uploader
 uploaded_file = st.file_uploader("Upload your Excel file", type=['xlsx', 'xls'])
@@ -293,13 +264,6 @@ if st.session_state.data is not None:
                 if st.button("❤️", key="match", help="It's a match! (Y)", type="primary"):
                     handle_decision(True)
             
-            st.markdown('<div class="shortcuts-info">', unsafe_allow_html=True)
-            st.markdown("""
-            **Keyboard Shortcuts:**
-            - Press 'Y' or '→' for Match
-            - Press 'N' or '←' for No Match
-            """)
-            st.markdown('</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
         with right_col:
