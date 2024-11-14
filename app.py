@@ -221,7 +221,7 @@ if st.session_state.data is not None:
         excel_data, count = save_matches()
         if excel_data:
             st.download_button(
-                label=f"💾 Make it Official – Save Your Picks! ({count} products)",
+                label=f"💾 Make it Official – ({count} products)",
                 data=excel_data,
                 file_name=f"product_matches_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
