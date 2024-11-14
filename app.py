@@ -22,9 +22,9 @@ st.markdown("""
 <style>
     .stButton > button {
         border-radius: 50% !important;
-        width: 400px !important;  /* Doubled width */
-        height: 400px !important; /* Doubled height */
-        font-size: 180px !important; /* Increased font size */
+        width: 800px !important;  /* Doubled width */
+        height: 800px !important; /* Doubled height */
+        font-size: 360px !important; /* Increased font size */
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
