@@ -50,9 +50,9 @@ st.markdown("""
 <style>
     .stButton > button {
         border-radius: 50% !important;
-        width: 250px !important;
-        height: 250px !important;
-        font-size: 120px !important;
+        width: 200px !important;
+        height: 200px !important;
+        font-size: 90px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -71,26 +71,26 @@ st.markdown("""
     }
 
     .product-card {
-        border-radius: 15px;
-        padding: 15px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+        padding: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         background: white;
-        margin: 0px;
+        margin: 5px 0;
     }
 
     .product-image-container {
         width: 100%;
-        height: 250px;
+        height: 200px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 5px 0;
+        margin: 0px;
         background: #f8f9fa;
-        border-radius: 8px;
+        border-radius: 5px;
     }
 
     .product-image-container img {
-        max-height: 250px !important;
+        max-height: 200px !important;
         width: auto !important;
         object-fit: contain !important;
     }
@@ -99,16 +99,17 @@ st.markdown("""
         margin: 0 !important;
         padding: 0 !important;
     }
-    
+
     .shortcuts-info {
         background: #f0f2f6;
-        padding: 10px;
+        padding: 5px;
         border-radius: 5px;
-        margin-top: 10px;
+        margin-top: 5px;
         text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
+
 
 def generate_product_page_url(sku, country_code='nl'):
     base_urls = {
