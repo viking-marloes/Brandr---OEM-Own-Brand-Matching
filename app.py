@@ -7,8 +7,6 @@ import re
 import io
 import json
 from datetime import datetime
-import time
-from concurrent.futures import ThreadPoolExecutor
 
 # Must be the first Streamlit command
 st.set_page_config(
@@ -21,7 +19,6 @@ st.set_page_config(
 # Add custom CSS for styling
 st.markdown("""
 <style>
-    /* MASSIVE matching buttons */
     .stButton > button {
         border-radius: 50% !important;
         width: 250px !important;
@@ -35,24 +32,15 @@ st.markdown("""
         box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important;
     }
 
-    .stButton > button:hover {
-        transform: scale(1.1) !important;
-    }
-
     button[kind="secondary"] {
         background-color: #ff4b4b !important;
+        color: white !important;
     }
     button[kind="primary"] {
         background-color: #4CAF50 !important;
+        color: white !important;
     }
 
-    .match-buttons {
-        display: flex;
-        justify-content: center;
-        gap: 80px;
-        margin: 20px 0;
-    }
-    
     .product-card {
         border-radius: 15px;
         padding: 15px;
@@ -61,10 +49,9 @@ st.markdown("""
         margin: 10px;
     }
 
-    /* Fixed size image container */
     .product-image-container {
         width: 100%;
-        height: 80px;  /* Fixed small height */
+        height: 60px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -73,57 +60,49 @@ st.markdown("""
         border-radius: 8px;
     }
 
-    /* Force consistent image size */
     .product-image-container img {
-        max-height: 60px !important;  /* Very small fixed height */
+        max-height: 60px !important;
         width: auto !important;
         object-fit: contain !important;
     }
 
-    .product-info {
-        margin-top: 10px;
-    }
-
-    .stSpinner > div {
-        position: relative;
-        top: 10px;
-    }
-
-    /* Hide default Streamlit elements */
-    .stDeployButton, footer {
-        display: none !important;
-    }
-
-    /* Compact layout */
-    .stMarkdown {
+    div.stMarkdown {
         margin: 0 !important;
         padding: 0 !important;
-    }
-
-    /* Keyboard shortcuts display */
-    .shortcuts {
-        background: #f0f2f6;
-        padding: 8px;
-        border-radius: 5px;
-        margin: 5px 0;
-        font-size: 0.9em;
-        text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state for keyboard handling
-if 'key_handled' not in st.session_state:
-    st.session_state.key_handled = False
+def generate_product_page_url(sku, country_code='nl'):
+    base_urls = {
+        "uk": "https://www.viking-direct.co.uk/en/-p-", 
+        "gb": "https://www.viking-direct.co.uk/en/-p-",
+        "ie": "https://www.vikingdirect.ie/en/-p-",
+        "de": "https://www.viking.de/de/-p-",
+        "at": "https://www.vikingdirekt.at/de/-p-",
+        "nl": "https://www.vikingdirect.nl/nl/-p-",
+        "benl": "https://www.vikingdirect.be/nl/-p-",
+        "befr": "https://www.vikingdirect.be/fr/-p-",
+        "bewa": "https://www.vikingdirect.be/fr/-p-",
+        "chde": "https://www.vikingdirekt.ch/de/-p-",
+        "chfr": "https://www.vikingdirekt.ch/fr/-p-",
+        "lu": "https://www.viking-direct.lu/fr/-p-"
+    }
+    base_url = base_urls.get(country_code.lower())
+    if base_url:
+        return f"{base_url}{sku}"
+    return None
 
 def extract_sku_image_url(html_content):
     pattern = r'datalayerInitialObject\s*=\s*({.*?});'
     match = re.search(pattern, html_content, re.DOTALL)
     if match:
-        json_text = match.group(1).replace("'", '"')
+        json_text = match.group(1)
+        json_text = json_text.replace("'", '"')
         try:
             data = json.loads(json_text)
-            sku_image_url = data.get("skuInfo", {}).get("skuImageURL", "")
+            sku_info = data.get("skuInfo", {})
+            sku_image_url = sku_info.get("skuImageURL", "")
             if sku_image_url.startswith("//"):
                 sku_image_url = "https:" + sku_image_url
             elif sku_image_url.startswith("/"):
@@ -135,50 +114,49 @@ def extract_sku_image_url(html_content):
             return None
     return None
 
-def load_and_resize_image(img_bytes, max_size=(60, 60)):
-    if img_bytes:
-        try:
-            img = Image.open(BytesIO(img_bytes))
-            img.thumbnail(max_size, Image.Resampling.LANCZOS)
-            return img
-        except Exception:
-            return None
-    return None
-
 @st.cache_data(ttl=3600)
-def get_product_image(sku, country_code='nl'):
+def get_product_image(sku):
     if not sku or pd.isna(sku):
         return None
-        
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
     
     try:
-        # Try direct product page first
-        product_url = f"https://www.vikingdirect.nl/nl/-p-{sku}"
-        response = requests.get(product_url, headers=headers, timeout=5)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
         
-        if response.status_code == 200:
+        # Try multiple country codes
+        for country in ['nl', 'uk', 'de']:
+            product_url = generate_product_page_url(sku, country)
+            if not product_url:
+                continue
+                
+            response = requests.get(product_url, headers=headers, timeout=10)
+            if response.status_code != 200:
+                continue
+                
             image_url = extract_sku_image_url(response.text)
-            if image_url:
-                img_response = requests.get(image_url, headers=headers, timeout=5)
-                if img_response.status_code == 200:
-                    return load_and_resize_image(img_response.content)
-                    
-    except Exception:
-        pass
+            if not image_url:
+                continue
+                
+            img_response = requests.get(image_url, headers=headers, timeout=10)
+            if img_response.status_code == 200:
+                img = Image.open(BytesIO(img_response.content))
+                img.thumbnail((60, 60), Image.Resampling.LANCZOS)
+                return img
+                
+    except Exception as e:
+        print(f"Error loading image for SKU {sku}: {str(e)}")
         
     return None
 
 def handle_decision(is_match):
-    if st.session_state.current_index < len(st.session_state.data):
-        current_row = st.session_state.data.iloc[st.session_state.current_index].to_dict()
-        st.session_state.matches.append({
-            'index': st.session_state.current_index,
-            'is_match': is_match,
-            'data': current_row
-        })
+    current_row = st.session_state.data.iloc[st.session_state.current_index].to_dict()
+    st.session_state.matches.append({
+        'index': st.session_state.current_index,
+        'is_match': is_match,
+        'data': current_row
+    })
+    if st.session_state.current_index < len(st.session_state.data) - 1:
         st.session_state.current_index += 1
         st.rerun()
 
@@ -250,21 +228,17 @@ if st.session_state.data is not None:
         
         left_col, center_col, right_col = st.columns([4,3,4])
         
-        # Preload both images
-        with st.spinner('Loading images...'):
-            own_image = get_product_image(str(current_row['Own SKU']))
-            oem_image = get_product_image(str(current_row['OEM SKU']))
-        
         with left_col:
             st.markdown('<div class="product-card">', unsafe_allow_html=True)
             st.subheader("Own Product")
-            st.markdown('<div class="product-image-container">', unsafe_allow_html=True)
-            if own_image:
-                st.image(own_image)
-            st.markdown('</div>', unsafe_allow_html=True)
-            with st.container():
-                st.markdown(f"**SKU:** {current_row['Own SKU']}")
-                st.markdown(f"**Title:** {current_row['Own Title']}")
+            with st.spinner('Loading own product image...'):
+                own_image = get_product_image(str(current_row['Own SKU']))
+                if own_image:
+                    st.markdown('<div class="product-image-container">', unsafe_allow_html=True)
+                    st.image(own_image)
+                    st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown(f"**SKU:** {current_row['Own SKU']}")
+            st.markdown(f"**Title:** {current_row['Own Title']}")
             st.markdown('</div>', unsafe_allow_html=True)
 
         with center_col:
@@ -274,8 +248,6 @@ if st.session_state.data is not None:
             st.markdown("---")
             st.markdown(current_row['Reasoning'])
             
-            # Match buttons
-            st.markdown('<div class="match-buttons">', unsafe_allow_html=True)
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("❌", key="no_match", help="Not a match (N)", type="secondary"):
@@ -283,34 +255,31 @@ if st.session_state.data is not None:
             with col2:
                 if st.button("❤️", key="match", help="It's a match! (Y)", type="primary"):
                     handle_decision(True)
-            st.markdown('</div>', unsafe_allow_html=True)
             
-            # Keyboard shortcuts
-            st.markdown('<div class="shortcuts">', unsafe_allow_html=True)
-            st.markdown("""
+            st.info("""
             **Keyboard Shortcuts:**
             - Press 'Y' or '→' for Match
             - Press 'N' or '←' for No Match
             """)
             st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
 
         with right_col:
             st.markdown('<div class="product-card">', unsafe_allow_html=True)
             st.subheader("OEM Product")
-            st.markdown('<div class="product-image-container">', unsafe_allow_html=True)
-            if oem_image:
-                st.image(oem_image)
-            st.markdown('</div>', unsafe_allow_html=True)
-            with st.container():
-                st.markdown(f"**SKU:** {current_row['OEM SKU']}")
-                st.markdown(f"**Title:** {current_row['OEM Title']}")
+            with st.spinner('Loading OEM product image...'):
+                oem_image = get_product_image(str(current_row['OEM SKU']))
+                if oem_image:
+                    st.markdown('<div class="product-image-container">', unsafe_allow_html=True)
+                    st.image(oem_image)
+                    st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown(f"**SKU:** {current_row['OEM SKU']}")
+            st.markdown(f"**Title:** {current_row['OEM Title']}")
             st.markdown('</div>', unsafe_allow_html=True)
 
     else:
         st.success("You've reviewed all products! Don't forget to save your progress.")
 
-# Add keyboard listener
+# Add keyboard handler
 st.markdown("""
 <script>
 document.addEventListener('keydown', function(e) {
