@@ -251,7 +251,7 @@ if st.session_state.data is not None:
 
         with center_col:
             st.markdown('<div class="product-card">', unsafe_allow_html=True)
-            st.markdown("### AI's Take – Why They’re a Match (or Not!)")
+            st.markdown("### AI's Take – Why They’re a Match")
             st.markdown(f"**Score:** {current_row['Certainty Score']}")
             st.markdown("---")
             st.markdown(current_row['Reasoning'])
