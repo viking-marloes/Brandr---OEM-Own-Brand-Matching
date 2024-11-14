@@ -80,18 +80,17 @@ st.markdown("""
 
     .product-image-container {
         width: 100%;
-        height: 200px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0px;
+        margin: 5px 0; /* Adjust as needed */
         background: #f8f9fa;
         border-radius: 5px;
     }
 
     .product-image-container img {
-        max-height: 200px !important;
-        width: auto !important;
+        max-width: 100%;
+        height: auto;
         object-fit: contain !important;
     }
 
@@ -109,6 +108,7 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
 
 
 def generate_product_page_url(sku, country_code='nl'):
