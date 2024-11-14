@@ -18,25 +18,32 @@ st.set_page_config(
 )
 
 # Add custom CSS and keyboard shortcuts JavaScript
-components.html(
-    """
-    <script>
-    const handleKeyPress = (e) => {
-        if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
-            document.querySelector('button[kind="primary"]').click();
-        } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
-            document.querySelector('button[kind="secondary"]').click();
+def init_keyboard_shortcuts():
+    components.html(
+        """
+        <script>
+        // Remove any existing event listeners
+        if (window.oldKeydownHandler) {
+            document.removeEventListener('keydown', window.oldKeydownHandler);
         }
-    };
-    
-    if (!window.keyListenerAdded) {
-        document.addEventListener('keydown', handleKeyPress);
-        window.keyListenerAdded = true;
-    }
-    </script>
-    """,
-    height=0
-)
+        
+        // Define new handler
+        window.oldKeydownHandler = function(e) {
+            if (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight') {
+                const matchButton = document.querySelector('button[kind="primary"]');
+                if (matchButton) matchButton.click();
+            } else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft') {
+                const noMatchButton = document.querySelector('button[kind="secondary"]');
+                if (noMatchButton) noMatchButton.click();
+            }
+        };
+        
+        // Add new handler
+        document.addEventListener('keydown', window.oldKeydownHandler);
+        </script>
+        """,
+        height=0,
+    )
 
 # Add custom CSS for styling
 st.markdown("""
@@ -68,12 +75,12 @@ st.markdown("""
         padding: 15px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         background: white;
-        margin: 10px;
+        margin: 0px;
     }
 
     .product-image-container {
         width: 100%;
-        height: 180px;
+        height: 250px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -83,7 +90,7 @@ st.markdown("""
     }
 
     .product-image-container img {
-        max-height: 180px !important;
+        max-height: 250px !important;
         width: auto !important;
         object-fit: contain !important;
     }
@@ -171,7 +178,7 @@ def get_product_image(sku):
             img_response = requests.get(image_url, headers=headers, timeout=10)
             if img_response.status_code == 200:
                 img = Image.open(BytesIO(img_response.content))
-                img.thumbnail((180, 180), Image.Resampling.LANCZOS)  # 3x bigger than before
+                img.thumbnail((250, 250), Image.Resampling.LANCZOS)  # 3x bigger than before
                 return img
                 
     except Exception as e:
@@ -215,6 +222,7 @@ if 'matches' not in st.session_state:
     st.session_state.matches = []
 
 st.title("Product Matcher 💘")
+init_keyboard_shortcuts()
 
 # File uploader
 uploaded_file = st.file_uploader("Upload your Excel file", type=['xlsx', 'xls'])
