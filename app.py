@@ -11,8 +11,8 @@ from datetime import datetime
 
 # Must be the first Streamlit command
 st.set_page_config(
-    page_title="Product Matcher",
-    page_icon="🎯",
+    page_title="Brandr: OEM to Own Brand Matching",
+    page_icon="💘",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -192,10 +192,10 @@ if 'current_index' not in st.session_state:
 if 'matches' not in st.session_state:
     st.session_state.matches = []
 
-st.title("Product Matcher 💘")
+st.title("Brandr: OEM to Own Brand Matching 💘")
 
 # File uploader
-uploaded_file = st.file_uploader("Upload your Excel file", type=['xlsx', 'xls'])
+uploaded_file = st.file_uploader("Drop Your Excel & Let’s Tango!", type=['xlsx', 'xls'])
 
 if uploaded_file is not None:
     try:
@@ -210,7 +210,7 @@ if st.session_state.data is not None:
     # Controls
     col1, col2, col3 = st.columns([2,1,1])
     with col1:
-        jump_to = st.number_input("Jump to row", 
+        jump_to = st.number_input("Jump to Row # - Speed Dating Style", 
                                 min_value=0, 
                                 max_value=len(st.session_state.data)-1, 
                                 value=st.session_state.current_index)
@@ -221,7 +221,7 @@ if st.session_state.data is not None:
         excel_data, count = save_matches()
         if excel_data:
             st.download_button(
-                label=f"💾 Save ({count} products)",
+                label=f"💾 Make it Official – Save Your Picks! ({count} products)",
                 data=excel_data,
                 file_name=f"product_matches_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -251,7 +251,7 @@ if st.session_state.data is not None:
 
         with center_col:
             st.markdown('<div class="product-card">', unsafe_allow_html=True)
-            st.markdown("### AI Reasoning")
+            st.markdown("### AI's Take – Why They’re a Match (or Not!)")
             st.markdown(f"**Score:** {current_row['Certainty Score']}")
             st.markdown("---")
             st.markdown(current_row['Reasoning'])
