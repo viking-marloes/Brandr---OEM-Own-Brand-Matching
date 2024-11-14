@@ -19,90 +19,134 @@ st.set_page_config(
 st.markdown("""
 <style>
     .product-card {
-        border-radius: 10px;
+        border-radius: 15px;
         padding: 20px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         background: white;
         margin: 10px;
         transition: transform 0.3s;
+        height: 100%;
     }
     .product-card:hover {
         transform: translateY(-5px);
     }
     .stButton > button {
         border-radius: 50% !important;
-        width: 80px !important;
-        height: 80px !important;
-        font-size: 30px !important;
+        width: 120px !important;
+        height: 120px !important;
+        font-size: 50px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         margin: 0 auto !important;
+        transition: transform 0.2s !important;
     }
-    .match-button {
-        background-color: #4CAF50 !important;
+    .stButton > button:hover {
+        transform: scale(1.1) !important;
     }
-    .no-match-button {
-        background-color: #f44336 !important;
-    }
-    .centered-content {
+    .match-buttons {
         display: flex;
         justify-content: center;
+        gap: 40px;
+        margin-top: 30px;
+    }
+    div[data-testid="stToolbar"] {
+        display: none;
+    }
+    .progress-info {
+        display: flex;
+        justify-content: space-between;
         align-items: center;
+        padding: 10px 20px;
+        background: #f0f2f6;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+    .download-section {
+        padding: 10px;
+        border-radius: 10px;
+        background: #f0f2f6;
+        margin-top: 10px;
+    }
+    .top-controls {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+        margin-bottom: 20px;
+        background: #f0f2f6;
+        padding: 20px;
+        border-radius: 10px;
+    }
+    .stButton > button[kind="secondary"] {
+        background-color: red !important;
+        color: white !important;
+    }
+    .stButton > button[kind="primary"] {
+        background-color: #4CAF50 !important;
+        color: white !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
+# Image loading functions
+@st.cache_data(ttl=3600)
+def fetch_image(url):
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            return response.content
+    except:
+        return None
+    return None
+
 def generate_product_page_url(sku, country_code='nl'):
     base_urls = {
-        "nl": "https://www.vikingdirect.nl/nl/-p-"
+        "nl": "https://www.vikingdirect.nl/nl/-p-",
+        "uk": "https://www.viking-direct.co.uk/en/-p-",
+        "de": "https://www.viking.de/de/-p-"
     }
     base_url = base_urls.get(country_code.lower())
     if base_url:
         return f"{base_url}{sku}"
     return None
 
-def extract_sku_image_url(html_content):
-    pattern = r'datalayerInitialObject\s*=\s*({.*?});'
-    match = re.search(pattern, html_content, re.DOTALL)
-    if match:
-        json_text = match.group(1).replace("'", '"')
-        try:
-            import json
-            data = json.loads(json_text)
-            sku_image_url = data.get("skuInfo", {}).get("skuImageURL", "")
-            if sku_image_url.startswith("//"):
-                sku_image_url = "https:" + sku_image_url
-            elif sku_image_url.startswith("/"):
-                sku_image_url = "https://www.viking-direct.co.uk" + sku_image_url
-            elif not sku_image_url.startswith("http"):
-                sku_image_url = "https://" + sku_image_url
-            return sku_image_url
-        except json.JSONDecodeError:
-            return None
-    return None
-
 def get_product_image(sku):
     try:
-        product_url = generate_product_page_url(sku)
-        if not product_url:
-            return None
-        
-        response = requests.get(product_url)
-        if response.status_code != 200:
-            return None
+        # Try multiple country codes if one fails
+        for country in ['nl', 'uk', 'de']:
+            product_url = generate_product_page_url(sku, country)
+            if not product_url:
+                continue
             
-        image_url = extract_sku_image_url(response.text)
-        if not image_url:
-            return None
-            
-        img_response = requests.get(image_url)
-        if img_response.status_code == 200:
-            return Image.open(BytesIO(img_response.content))
-        return None
+            response = requests.get(product_url, timeout=10)
+            if response.status_code != 200:
+                continue
+                
+            pattern = r'datalayerInitialObject\s*=\s*({.*?});'
+            match = re.search(pattern, response.text, re.DOTALL)
+            if not match:
+                continue
+                
+            json_text = match.group(1).replace("'", '"')
+            try:
+                data = json.loads(json_text)
+                image_url = data.get("skuInfo", {}).get("skuImageURL", "")
+                if image_url:
+                    if image_url.startswith("//"):
+                        image_url = "https:" + image_url
+                    elif image_url.startswith("/"):
+                        image_url = f"https://www.vikingdirect.{country}" + image_url
+                    elif not image_url.startswith("http"):
+                        image_url = "https://" + image_url
+                        
+                    img_data = fetch_image(image_url)
+                    if img_data:
+                        return Image.open(BytesIO(img_data))
+            except:
+                continue
     except Exception as e:
-        st.error(f"Error fetching image for SKU {sku}: {str(e)}")
-        return None
+        print(f"Error fetching image for SKU {sku}: {str(e)}")
+    return None
 
 def handle_decision(is_match):
     current_row = st.session_state.data.iloc[st.session_state.current_index].to_dict()
@@ -116,35 +160,21 @@ def handle_decision(is_match):
         st.rerun()
 
 def save_matches():
-    if not st.session_state.matches:
-        # Include all unmatched products as potential matches
-        matched_indices = {match['index'] for match in st.session_state.matches}
-        all_data = []
+    matched_indices = {match['index'] for match in st.session_state.matches if match['is_match'] is False}
+    all_data = []
+    
+    for idx in range(len(st.session_state.data)):
+        if idx not in matched_indices:
+            all_data.append(st.session_state.data.iloc[idx].to_dict())
+    
+    if all_data:
+        df = pd.DataFrame(all_data)
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
         
-        for idx in range(len(st.session_state.data)):
-            if idx not in matched_indices:
-                all_data.append(st.session_state.data.iloc[idx].to_dict())
-            else:
-                match = next((m for m in st.session_state.matches if m['index'] == idx), None)
-                if match and match['is_match']:
-                    all_data.append(match['data'])
-        
-        if all_data:
-            df = pd.DataFrame(all_data)
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False)
-            
-            st.download_button(
-                label="Download Products",
-                data=output.getvalue(),
-                file_name=f"product_matches_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            
-            st.success(f"Ready to download {len(all_data)} products!")
-        else:
-            st.warning("No products to save!")
+        return output.getvalue(), len(all_data)
+    return None, 0
 
 # Initialize session state
 if 'data' not in st.session_state:
@@ -169,7 +199,8 @@ if uploaded_file is not None:
         st.error(f"Error reading Excel file: {str(e)}")
 
 if st.session_state.data is not None:
-    # Progress and controls
+    # Top controls section
+    st.markdown('<div class="top-controls">', unsafe_allow_html=True)
     col1, col2, col3 = st.columns([2,1,1])
     with col1:
         jump_to = st.number_input("Jump to row", 
@@ -180,11 +211,18 @@ if st.session_state.data is not None:
             st.session_state.current_index = jump_to
 
     with col2:
-        if st.button("Save Progress"):
-            save_matches()
+        excel_data, count = save_matches()
+        if excel_data:
+            st.download_button(
+                label=f"💾 Save ({count} products)",
+                data=excel_data,
+                file_name=f"product_matches_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
     with col3:
-        st.write(f"Product {st.session_state.current_index + 1} of {len(st.session_state.data)}")
+        st.markdown(f"### {st.session_state.current_index + 1} / {len(st.session_state.data)}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # Main content
     if st.session_state.current_index < len(st.session_state.data):
@@ -197,10 +235,12 @@ if st.session_state.data is not None:
             st.markdown('<div class="product-card">', unsafe_allow_html=True)
             st.subheader("Own Product")
             
-            # Fetch and display image
-            own_image = get_product_image(current_row['Own SKU'])
+            # Try to load image
+            own_image = get_product_image(str(current_row['Own SKU']))
             if own_image:
                 st.image(own_image, use_column_width=True)
+            else:
+                st.image("https://via.placeholder.com/400x400.png?text=No+Image", use_column_width=True)
             
             st.markdown(f"**SKU:** {current_row['Own SKU']}")
             st.markdown(f"**Title:** {current_row['Own Title']}")
@@ -209,28 +249,32 @@ if st.session_state.data is not None:
         with center_col:
             st.markdown('<div class="product-card">', unsafe_allow_html=True)
             st.markdown("### AI Reasoning")
-            st.markdown(f"**Certainty Score:** {current_row['Certainty Score']}")
+            st.markdown(f"**Score:** {current_row['Certainty Score']}")
             st.markdown("---")
             st.markdown(current_row['Reasoning'])
             
-            # Tinder-style buttons
+            # Larger matching buttons
+            st.markdown('<div class="match-buttons">', unsafe_allow_html=True)
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("❌", key="no_match", help="Not a match"):
+                if st.button("❌", key="no_match", help="Not a match", type="secondary"):
                     handle_decision(False)
             with col2:
-                if st.button("❤️", key="match", help="It's a match!"):
+                if st.button("❤️", key="match", help="It's a match!", type="primary"):
                     handle_decision(True)
+            st.markdown('</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
         with right_col:
             st.markdown('<div class="product-card">', unsafe_allow_html=True)
             st.subheader("OEM Product")
             
-            # Fetch and display image
-            oem_image = get_product_image(current_row['OEM SKU'])
+            # Try to load image
+            oem_image = get_product_image(str(current_row['OEM SKU']))
             if oem_image:
                 st.image(oem_image, use_column_width=True)
+            else:
+                st.image("https://via.placeholder.com/400x400.png?text=No+Image", use_column_width=True)
             
             st.markdown(f"**SKU:** {current_row['OEM SKU']}")
             st.markdown(f"**Title:** {current_row['OEM Title']}")
